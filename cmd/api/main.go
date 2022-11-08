@@ -14,6 +14,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/startdusk/greenlight/internal/data"
+	"github.com/startdusk/greenlight/internal/jsonlog"
 
 	_ "github.com/lib/pq"
 )
@@ -41,7 +42,7 @@ type config struct {
 // logger, but it will grow to include a lot more as our build progresses.
 type application struct {
 	config config
-	logger *log.Logger
+	logger *jsonlog.Logger
 	models data.Models
 }
 
@@ -61,7 +62,7 @@ func main() {
 	flag.Parse()
 	// Initialize a new logger which writes messages to the standard out stream,
 	// prefixed with the current date and time.
-	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
 	db, err := openDB(cfg)
 	if err != nil {
@@ -69,7 +70,7 @@ func main() {
 	}
 	defer db.Close()
 
-	logger.Println("database connection pool established")
+	logger.Info("database connection pool established")
 
 	migrationDriver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
@@ -89,7 +90,7 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	logger.Printf("database migrations applied, version %d dirty %v\n", version, dirty)
+	logger.Info(fmt.Sprintf("database migrations applied, version %d dirty %v", version, dirty))
 
 	app := &application{
 		config: cfg,
@@ -103,12 +104,17 @@ func main() {
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.port),
 		Handler:      app.routes(),
+		ErrorLog:     log.New(logger, "", 0),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 	// Start the HTTP server.
-	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
+	logger.PrintInfo("starting server", map[string]string{
+		"addr": srv.Addr,
+		"env":  cfg.env,
+	})
+
 	err = srv.ListenAndServe()
 	logger.Fatal(err)
 }
