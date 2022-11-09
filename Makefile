@@ -25,3 +25,7 @@ migratedownall:
 .PHONY: run
 run:
 	@go run ./cmd/api/...
+
+.PHONY: api-test
+api-test: 
+	@hurl api.hurl
