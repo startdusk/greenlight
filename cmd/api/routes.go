@@ -49,5 +49,5 @@ func (app *application) routes() http.Handler {
 	}
 
 	// Return the httprouter instance.
-	return app.recoverPanic(app.enalbeCORS(app.rateLimit(app.authentication(router))))
+	return app.metrics(app.recoverPanic(app.enalbeCORS(app.rateLimit(app.authentication(router)))))
 }

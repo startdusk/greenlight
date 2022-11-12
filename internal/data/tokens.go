@@ -36,7 +36,7 @@ func generateToken(userID int64, ttl time.Duration, scope string) (*Token, error
 	// Use the Read() function from the crypto/rand package to fill the byte slice with
 	// random bytes from your operating system's CSPRNG. This will return an error if
 	// the CSPRNG fails to function correctly.
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
 	_, err := rand.Read(randomBytes)
 	if err != nil {
 		return nil, err

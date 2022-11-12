@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -119,12 +121,28 @@ func main() {
 	if err := migrator.Up(); err != nil && err != migrate.ErrNoChange {
 		logger.Fatal(err)
 	}
-	version, dirty, err := migrator.Version()
+	migrateVersion, dirty, err := migrator.Version()
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	logger.Info(fmt.Sprintf("database migrations applied, version %d dirty %v", version, dirty))
+	logger.Info(fmt.Sprintf("database migrations applied, version %d dirty %v", migrateVersion, dirty))
+
+	// Publish a new "version" variable in the expvar handler containing our application
+	// version number (currently the constant "1.0.0").
+	expvar.NewString("version").Set(version)
+	// Publish the number of active goroutines.
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
+	// Publish the database connection pool statistics.
+	expvar.Publish("database", expvar.Func(func() any {
+		return db.Stats()
+	}))
+	// Publish the current Unix timestamp.
+	expvar.Publish("timestamp", expvar.Func(func() any {
+		return time.Now().Unix()
+	}))
 
 	app := &application{
 		config: cfg,
