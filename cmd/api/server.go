@@ -49,6 +49,7 @@ func (app *application) serve() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
+		app.wg.Wait()
 		shutdownError <- srv.Shutdown(ctx)
 	}()
 

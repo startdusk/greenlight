@@ -2,6 +2,7 @@ package jsonlog
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"runtime/debug"
@@ -64,8 +65,12 @@ func (l *Logger) Info(message string) {
 	l.PrintInfo(message, nil)
 }
 
+func (l *Logger) Error(err error) {
+	l.PrintError(err, nil)
+}
+
 func (l *Logger) PrintError(err error, properties map[string]string) {
-	l.print(LevelError, err.Error(), properties)
+	l.print(LevelError, fmt.Sprintf("%+v", err), properties)
 }
 
 func (l *Logger) Fatal(err error) {
@@ -73,7 +78,7 @@ func (l *Logger) Fatal(err error) {
 }
 
 func (l *Logger) PrintFatal(err error, properties map[string]string) {
-	l.print(LevelFatal, err.Error(), properties)
+	l.print(LevelFatal, fmt.Sprintf("%+v", err), properties)
 	os.Exit(1) // For entries at the FATAL level, we also terminate the application.
 }
 

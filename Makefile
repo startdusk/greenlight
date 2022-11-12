@@ -1,5 +1,5 @@
 .PHONY: clean
-clearn:
+clean:
 	@go vet ./...
 	@go fmt ./...
 
@@ -24,7 +24,7 @@ migratedownall:
 
 .PHONY: run
 run:
-	@go run ./cmd/api/...
+	@go run ./cmd/api 
 
 .PHONY: api-test
 api-test: 

@@ -18,3 +18,17 @@ curl -w '\nTime: %{time_total}s \n' localhost:4000/v1/movies/1
 curl "localhost:4000/v1/movies?title=godfather&genres=crime,drama&page=1&page_size=5&sort=year"
 
 xargs -I % -P8 curl "localhost:4000/v1/healthcheck" < <(printf '%s\n' {1..8})
+
+
+curl -d '{"name": "Edith Smith", "email": "edith@example.com", "password": "pa55word"}'  localhost:4000/v1/users & pkill -SIGTERM api &
+
+curl -X PUT -d '{"token": "invalid"}' localhost:4000/v1/users/activated
+
+
+curl -X PUT -d '{"token": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"}' localhost:4000/v1/users/activated
+
+power read
+curl -i -d '{"email": "21311@gmail.com", "password": "pa55word"}' localhost:4000/v1/tokens/authentication
+
+power read write
+curl -i -d '{"email": "test@example.com", "password": "pa55word"}' localhost:4000/v1/tokens/authentication
