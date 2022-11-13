@@ -4,14 +4,16 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/felixge/httpsnoop"
 	"github.com/startdusk/greenlight/internal/data"
 	"github.com/startdusk/greenlight/internal/validator"
+	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 )
 
@@ -68,12 +70,8 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 	}()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Extract the client's IP address from the request.
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			app.serverErrorResponse(w, r, err)
-			return
-		}
+		// Use the realip.FromRequest() function to get the client's real IP address.
+		ip := realip.FromRequest(r)
 
 		// Lock the mutex to prevent this code from being executed concurrently
 		mu.Lock()
@@ -82,7 +80,9 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		// initialize a new rate limiter and add the IP address and limiter to the map.
 		if _, found := clients[ip]; !found {
 			// Create and add a new client struct to the map if it doesn't already exist.
-			clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
+			clients[ip] = &client{
+				limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst),
+			}
 		}
 
 		// Update the last seen time for the client.
@@ -228,25 +228,31 @@ func (app *application) metrics(next http.Handler) http.Handler {
 	totalRequestsReceived := expvar.NewInt("total_requests_received")
 	totalResponsesSent := expvar.NewInt("total_responses_sent")
 	totalProcessingTimeMicroseconds := expvar.NewInt("total_processing_time_μs")
+	// Declare a new expvar map to hold the count of responses for each HTTP status
+	// code.
+	totalResponsesSentByStatus := expvar.NewMap("total_responses_sent_by_status")
 
 	// The following code will be run for every request...
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Record the time that we started to process the request.
-		start := time.Now()
-
 		// Use the Add() method to increment the number of requests received by 1.
 		totalRequestsReceived.Add(1)
 
-		// Call the next handler in the chain.
-		next.ServeHTTP(w, r)
+		// Call the httpsnoop.CaptureMetrics() function, passing in the next handler in
+		// the chain along with the existing http.ResponseWriter and http.Request. This
+		// returns the metrics struct that we saw above.
+		metrics := httpsnoop.CaptureMetrics(next, w, r)
 
 		// On the way back up the middleware chain, increment the number of responses
 		// sent by 1.
 		totalResponsesSent.Add(1)
 
-		// Calculate the number of microseconds since we began to process the request,
-		// then increment the total processing time by this amount.
-		duration := time.Since(start).Microseconds()
-		totalProcessingTimeMicroseconds.Add(duration)
+		// Get the request processing time in microseconds from httpsnoop and increment
+		// the cumulative processing time.
+		totalProcessingTimeMicroseconds.Add(metrics.Duration.Microseconds())
+
+		// Use the Add() method to increment the count for the given status code by 1.
+		// Note that the expvar map is string-keyed, so we need to use the strconv.Itoa()
+		// function to convert the status code (which is an integer) to a string.
+		totalResponsesSentByStatus.Add(strconv.Itoa(metrics.Code), 1)
 	})
 }
